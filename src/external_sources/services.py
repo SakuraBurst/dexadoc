@@ -40,8 +40,9 @@ class ScanResult:
 class ExternalSourceScanner:
     DEFAULT_IGNORE_PATTERNS = ["~$*", "._*", "Thumbs.db", "desktop.ini"]
 
-    def __init__(self, source: ExternalSource):
+    def __init__(self, source: ExternalSource, *, synchronous: bool = False):
         self.source = source
+        self.synchronous = synchronous
         self.ignore_patterns = self._build_ignore_patterns()
         self.include_re = re.compile(source.include_regex) if source.include_regex else None
         self.exclude_re = re.compile(source.exclude_regex) if source.exclude_regex else None
@@ -61,7 +62,7 @@ class ExternalSourceScanner:
             result.errors.append(f"mount_root does not exist or is not a directory: {mount_root}")
             return result
 
-        seen_pks: set[int] = set()
+        seen_relpaths: set[str] = set()
 
         for dirpath, dirnames, filenames in os.walk(
             mount_root,
@@ -94,7 +95,7 @@ class ExternalSourceScanner:
                         relpath=relpath,
                         mode=mode,
                         result=result,
-                        seen_pks=seen_pks,
+                        seen_relpaths=seen_relpaths,
                     )
                 except Exception as e:
                     result.error_count += 1
@@ -106,7 +107,7 @@ class ExternalSourceScanner:
             storage_backend=StorageBackend.EXTERNAL,
             external_source=self.source,
             source_available=True,
-        ).exclude(pk__in=seen_pks)
+        ).exclude(external_relpath__in=seen_relpaths)
 
         result.missing_count = unseen_qs.count()
         unseen_qs.update(
@@ -122,7 +123,7 @@ class ExternalSourceScanner:
         relpath: str,
         mode: str,
         result: ScanResult,
-        seen_pks: set[int],
+        seen_relpaths: set[str],
     ):
         filename = filepath.name
 
@@ -149,6 +150,7 @@ class ExternalSourceScanner:
             return
 
         result.seen_count += 1
+        seen_relpaths.add(relpath)
 
         # Look up existing document
         existing = Document.objects.filter(
@@ -158,8 +160,6 @@ class ExternalSourceScanner:
         ).first()
 
         if existing:
-            seen_pks.add(existing.pk)
-
             # Check if file changed
             if (
                 existing.external_mtime_ns == stat.st_mtime_ns
@@ -203,7 +203,10 @@ class ExternalSourceScanner:
             source_stat_size=stat.st_size,
         )
 
-        consume_file.delay(input_doc)
+        if self.synchronous:
+            consume_file(input_doc, None)
+        else:
+            consume_file.delay(input_doc, None)
 
     def _should_ignore(self, filename: str) -> bool:
         for pattern in self.ignore_patterns:

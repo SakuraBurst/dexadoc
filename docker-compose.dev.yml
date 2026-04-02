@@ -1,0 +1,48 @@
+name: dexadoc-dev
+
+# Dev infrastructure for running dexadoc backend locally.
+# Usage: docker compose -f docker-compose.dev.yml up -d
+#
+# This starts only supporting services with host-exposed ports.
+# Run Django + Celery locally with: source dev.env && cd src && uv run manage.py runserver
+services:
+  db:
+    image: docker.io/library/postgres:18
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    volumes:
+      - dexadoc_pgdata:/var/lib/postgresql
+    environment:
+      POSTGRES_DB: dexadoc
+      POSTGRES_USER: dexadoc
+      POSTGRES_PASSWORD: dexadoc
+
+  broker:
+    image: docker.io/library/redis:8
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - dexadoc_redis:/data
+
+  gotenberg:
+    image: docker.io/gotenberg/gotenberg:8.27
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    command:
+      - gotenberg
+      - --chromium-disable-javascript=true
+      - --chromium-allow-list=file:///tmp/.*
+      - --api-timeout=120s
+
+  tika:
+    image: docker.io/apache/tika:3.3.0.0
+    restart: unless-stopped
+    ports:
+      - "9998:9998"
+
+volumes:
+  dexadoc_pgdata:
+  dexadoc_redis:

@@ -1,0 +1,111 @@
+services:
+  broker:
+    image: ${REDIS_IMAGE}
+    restart: unless-stopped
+    volumes:
+      - ./volumes/redis:/data
+
+  db:
+    image: ${POSTGRES_IMAGE}
+    restart: unless-stopped
+    volumes:
+      - ./volumes/postgres:/var/lib/postgresql
+    environment:
+      POSTGRES_DB: ${PAPERLESS_DBNAME}
+      POSTGRES_USER: ${PAPERLESS_DBUSER}
+      POSTGRES_PASSWORD: ${PAPERLESS_DBPASS}
+
+  gotenberg:
+    image: ${GOTENBERG_IMAGE}
+    restart: unless-stopped
+    command:
+      - gotenberg
+      - --chromium-disable-javascript=true
+      - --chromium-allow-list=file:///tmp/.*
+      - --api-timeout=${GOTENBERG_API_TIMEOUT}
+
+  tika:
+    image: ${TIKA_IMAGE}
+    restart: unless-stopped
+
+  webserver:
+    image: ${PAPERLESS_IMAGE}
+    restart: unless-stopped
+    depends_on:
+      - db
+      - broker
+      - gotenberg
+      - tika
+    ports:
+      - "${PAPERLESS_WEB_PORT}:8000"
+    volumes:
+      - ./volumes/paperless/data:/usr/src/paperless/data
+      - ./volumes/paperless/media:/usr/src/paperless/media
+      - ./staging/consume:/usr/src/paperless/consume
+      - ./export:/usr/src/paperless/export
+      - ./hooks:/opt/pilot-hooks:ro
+      - ./state:/opt/pilot-state
+    environment:
+      USERMAP_UID: ${USERMAP_UID}
+      USERMAP_GID: ${USERMAP_GID}
+
+      PAPERLESS_REDIS: redis://broker:6379
+      PAPERLESS_DBHOST: db
+      PAPERLESS_DBENGINE: postgresql
+      PAPERLESS_DBPORT: 5432
+      PAPERLESS_DBNAME: ${PAPERLESS_DBNAME}
+      PAPERLESS_DBUSER: ${PAPERLESS_DBUSER}
+      PAPERLESS_DBPASS: ${PAPERLESS_DBPASS}
+
+      PAPERLESS_TIKA_ENABLED: 1
+      PAPERLESS_TIKA_ENDPOINT: http://tika:9998
+      PAPERLESS_TIKA_GOTENBERG_ENDPOINT: http://gotenberg:3000
+
+      PAPERLESS_URL: ${PAPERLESS_URL}
+      PAPERLESS_TIME_ZONE: ${PAPERLESS_TIME_ZONE}
+      PAPERLESS_SECRET_KEY: ${PAPERLESS_SECRET_KEY}
+
+      PAPERLESS_ADMIN_USER: ${PAPERLESS_ADMIN_USER}
+      PAPERLESS_ADMIN_PASSWORD: ${PAPERLESS_ADMIN_PASSWORD}
+      PAPERLESS_ADMIN_MAIL: ${PAPERLESS_ADMIN_MAIL}
+
+      PAPERLESS_OCR_LANGUAGE: ${PAPERLESS_OCR_LANGUAGE}
+      PAPERLESS_OCR_LANGUAGES: ${PAPERLESS_OCR_LANGUAGES}
+      PAPERLESS_DATE_PARSER_LANGUAGES: ${PAPERLESS_DATE_PARSER_LANGUAGES}
+
+      PAPERLESS_CONSUMER_RECURSIVE: ${PAPERLESS_CONSUMER_RECURSIVE}
+      PAPERLESS_CONSUMER_SUBDIRS_AS_TAGS: ${PAPERLESS_CONSUMER_SUBDIRS_AS_TAGS}
+
+      PAPERLESS_EMPTY_TRASH_DIR: /usr/src/paperless/media/trash
+      PAPERLESS_FILENAME_FORMAT: ${PAPERLESS_FILENAME_FORMAT}
+      PAPERLESS_FILENAME_FORMAT_REMOVE_NONE: ${PAPERLESS_FILENAME_FORMAT_REMOVE_NONE}
+
+      PAPERLESS_POST_CONSUME_SCRIPT: /opt/pilot-hooks/paperless_post_consume.py
+
+      PILOT_STATE_DB: /opt/pilot-state/share_sync.sqlite3
+      PILOT_CONSUME_ROOT: /usr/src/paperless/consume
+      PILOT_IMPORT_LOG: /opt/pilot-state/import-log.jsonl
+
+  share-sync:
+    image: python:3.12-slim
+    restart: unless-stopped
+    user: "${USERMAP_UID}:${USERMAP_GID}"
+    working_dir: /app
+    volumes:
+      - ./scripts:/app/scripts:ro
+      - ./config/share-sync:/config:ro
+      - ./state:/state
+      - ./intake/mirror:/mirror
+      - ./staging/consume:/queue
+      - ${WINDOWS_SHARE_MOUNT}:/source:ro
+    environment:
+      SOURCE_DIR: /source
+      MIRROR_DIR: /mirror
+      QUEUE_DIR: /queue
+      STATE_DB: /state/share_sync.sqlite3
+      EXCLUDE_FILE: /config/exclude.txt
+      SYNC_INTERVAL_SECONDS: ${SYNC_INTERVAL_SECONDS}
+      SYNC_MAX_FILES_PER_RUN: ${SYNC_MAX_FILES_PER_RUN}
+      REQUEUE_MISSING_AFTER_SECONDS: ${REQUEUE_MISSING_AFTER_SECONDS}
+      INCLUDE_EXTENSIONS: ${SYNC_INCLUDE_EXTENSIONS}
+    command: ["python", "/app/scripts/share_sync.py", "--daemon"]

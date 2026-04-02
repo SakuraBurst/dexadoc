@@ -1,0 +1,10 @@
+[Unit]
+Description=Run Paperless share sync every 5 minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+Unit=paperless-sync.service
+
+[Install]
+WantedBy=timers.target

@@ -11,7 +11,7 @@ logger = logging.getLogger("paperless.external_sources.tasks")
 
 
 @shared_task
-def scan_external_source(source_id: int, mode: str = "delta"):
+def scan_external_source(source_id: int, mode: str = "delta", synchronous: bool = False):
     """Scan a single external source for new/changed/missing files."""
     source = ExternalSource.objects.get(pk=source_id)
 
@@ -31,7 +31,7 @@ def scan_external_source(source_id: int, mode: str = "delta"):
     source.save(update_fields=["last_scan_started_at", "last_scan_status"])
 
     try:
-        scanner = ExternalSourceScanner(source)
+        scanner = ExternalSourceScanner(source, synchronous=synchronous)
         result = scanner.scan(mode=mode)
 
         scan.seen_count = result.seen_count

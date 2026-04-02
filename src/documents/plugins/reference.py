@@ -419,9 +419,6 @@ class ReferenceConsumerPlugin(
             filename=None,
         )
 
-        self.apply_overrides(document)
-        document.save()
-
         return document
 
     def _cleanup_scratch(self):

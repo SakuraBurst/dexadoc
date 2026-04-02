@@ -40,7 +40,7 @@ class Command(BaseCommand):
         self.stdout.write(f"Scanning source '{source.code}' ({source.name}) in {mode} mode...")
 
         if options["sync"]:
-            scan_external_source(source.pk, mode=mode)
+            scan_external_source(source.pk, mode=mode, synchronous=True)
         else:
             scan_external_source.delay(source.pk, mode=mode)
             self.stdout.write("Scan task dispatched to Celery.")

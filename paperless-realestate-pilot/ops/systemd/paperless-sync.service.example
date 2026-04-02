@@ -1,0 +1,9 @@
+[Unit]
+Description=Run one Paperless share sync pass
+After=docker.service
+Wants=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/ABSOLUTE/PATH/TO/paperless-realestate-pilot
+ExecStart=/usr/bin/docker compose run --rm share-sync python /app/scripts/share_sync.py --once

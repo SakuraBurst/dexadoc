@@ -940,7 +940,11 @@ def before_task_publish_handler(sender=None, headers=None, body=None, **kwargs):
         close_old_connections()
 
         task_args = body[0]
-        input_doc, overrides = task_args
+        if len(task_args) >= 2:
+            input_doc, overrides = task_args[0], task_args[1]
+        else:
+            input_doc = task_args[0]
+            overrides = None
 
         task_file_name = input_doc.original_file.name
         user_id = overrides.owner_id if overrides else None

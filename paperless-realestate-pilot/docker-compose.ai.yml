@@ -1,0 +1,17 @@
+services:
+  paperless-gpt:
+    image: ${PAPERLESS_GPT_IMAGE:-docker.io/icereed/paperless-gpt:v0.25.1}
+    restart: unless-stopped
+    depends_on:
+      - webserver
+    env_file:
+      - ./paperless-gpt.env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "${PAPERLESS_GPT_PORT:-8080}:8080"
+    volumes:
+      - ./paperless-gpt/prompts:/app/prompts
+      - ./paperless-gpt/hocr:/app/hocr
+      - ./paperless-gpt/pdf:/app/pdf
+      - ./paperless-gpt/credentials:/app/credentials:ro

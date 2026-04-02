@@ -1,0 +1,21 @@
+# Windows / desktop junk
+Thumbs.db
+desktop.ini
+$RECYCLE.BIN/*
+System Volume Information/*
+
+# Microsoft Office temp files
+~$*
+*.tmp
+*.temp
+*.part
+
+# macOS junk
+.DS_Store
+._*
+
+# app / sync leftovers
+*.crdownload
+*.download
+*.swp
+*.bak
