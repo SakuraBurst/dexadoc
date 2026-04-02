@@ -327,6 +327,24 @@ def set_storage_path(
 # see empty_trash in documents/tasks.py for signal handling
 def cleanup_document_deletion(sender, instance, **kwargs):
     with FileLock(settings.MEDIA_LOCK):
+        # --- dexadoc: external docs only have local thumbnail + archive cache ---
+        if getattr(instance, "is_external", False):
+            local_files = [instance.thumbnail_path]
+            if instance.has_archive_version:
+                local_files.append(instance.archive_path)
+            for filepath in local_files:
+                if filepath and Path(filepath).is_file():
+                    try:
+                        Path(filepath).unlink()
+                        logger.debug(f"Deleted local cache file {filepath}.")
+                    except OSError as e:
+                        logger.warning(
+                            f"While deleting external document {instance!s}, "
+                            f"could not delete {filepath}: {e}",
+                        )
+            return
+        # --- end dexadoc ---
+
         if settings.EMPTY_TRASH_DIR:
             # Find a non-conflicting filename in case a document with the same
             # name was moved to trash earlier
@@ -447,6 +465,11 @@ def update_filename_and_move_files(
             msg = f"Document {instance!s}: Cannot rename file since target path {new_path} already exists."
             logger.warning(msg)
             raise CannotMoveFilesException(msg)
+
+    # --- dexadoc: external docs have no local original to move/rename ---
+    if getattr(instance, "is_external", False):
+        return
+    # --- end dexadoc ---
 
     if not instance.filename:
         # Can't update the filename if there is no filename to begin with

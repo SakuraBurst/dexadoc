@@ -1070,6 +1070,18 @@ class DocumentSerializer(
     created_date = serializers.DateField(required=False)
     page_count = SerializerMethodField()
 
+    # dexadoc: external reference read-only fields
+    storage_backend_type = serializers.CharField(
+        source="storage_backend",
+        read_only=True,
+    )
+    is_external = serializers.BooleanField(read_only=True)
+    external_source = serializers.PrimaryKeyRelatedField(read_only=True)
+    external_relpath = serializers.CharField(read_only=True, allow_null=True)
+    display_source_path = serializers.CharField(read_only=True, allow_null=True)
+    source_available = serializers.BooleanField(read_only=True)
+    last_seen_at = serializers.DateTimeField(read_only=True, allow_null=True)
+
     notes = NotesSerializer(many=True, required=False, read_only=True)
 
     custom_fields = CustomFieldInstanceSerializer(
@@ -1281,6 +1293,13 @@ class DocumentSerializer(
             "remove_inbox_tags",
             "page_count",
             "mime_type",
+            "storage_backend_type",
+            "is_external",
+            "external_source",
+            "external_relpath",
+            "display_source_path",
+            "source_available",
+            "last_seen_at",
         )
         list_serializer_class = OwnedObjectListSerializer
 

@@ -21,7 +21,9 @@ from django.db.models import Value
 from django.db.models import When
 from django.db.models.functions import Cast
 from django.utils.translation import gettext_lazy as _
+from django_filters import CharFilter
 from django_filters import DateFilter
+from django_filters import NumberFilter
 from django_filters.rest_framework import BooleanFilter
 from django_filters.rest_framework import Filter
 from django_filters.rest_framework import FilterSet
@@ -751,6 +753,11 @@ class DocumentFilterSet(FilterSet):
     shared_by__id = SharedByUser()
 
     mime_type = MimeTypeFilter()
+
+    # dexadoc: external reference filters
+    storage_backend = CharFilter(field_name="storage_backend")
+    source_available = BooleanFilter(field_name="source_available")
+    external_source__id = NumberFilter(field_name="external_source__id")
 
     # Backwards compatibility
     created__date__gt = DateFilter(field_name="created", lookup_expr="gt")

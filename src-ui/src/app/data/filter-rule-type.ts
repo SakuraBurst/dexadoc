@@ -66,6 +66,11 @@ export const FILTER_CUSTOM_FIELDS_QUERY = 42
 
 export const FILTER_MIME_TYPE = 47
 
+// dexadoc: external reference filters
+export const FILTER_STORAGE_BACKEND = 48
+export const FILTER_SOURCE_AVAILABLE = 49
+export const FILTER_EXTERNAL_SOURCE = 50
+
 export const FILTER_RULE_TYPES: FilterRuleType[] = [
   {
     id: FILTER_TITLE,
@@ -362,6 +367,26 @@ export const FILTER_RULE_TYPES: FilterRuleType[] = [
     id: FILTER_MIME_TYPE,
     filtervar: 'mime_type',
     datatype: 'string',
+    multi: false,
+  },
+  // dexadoc: external reference filters
+  {
+    id: FILTER_STORAGE_BACKEND,
+    filtervar: 'storage_backend',
+    datatype: 'string',
+    multi: false,
+  },
+  {
+    id: FILTER_SOURCE_AVAILABLE,
+    filtervar: 'source_available',
+    datatype: 'boolean',
+    multi: false,
+    default: true,
+  },
+  {
+    id: FILTER_EXTERNAL_SOURCE,
+    filtervar: 'external_source__id',
+    datatype: 'number',
     multi: false,
   },
 ]

@@ -46,6 +46,9 @@
           @if (displayFields.includes(DisplayField.TITLE)) {
             {{document.title | documentTitle}}
           }
+          @if (document?.is_external) {
+            <span class="badge text-bg-info ms-1" style="font-size: 0.65em">External</span>
+          }
         } @else {
           <div class="placeholder bg-secondary w-100"></div>
           <div class="placeholder bg-secondary w-50"></div>

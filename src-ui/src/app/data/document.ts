@@ -159,6 +159,21 @@ export interface Document extends ObjectWithPermissions {
 
   page_count?: number
 
+  // dexadoc: external reference fields
+  storage_backend_type?: string
+
+  is_external?: boolean
+
+  external_source?: number
+
+  external_relpath?: string
+
+  display_source_path?: string
+
+  source_available?: boolean
+
+  last_seen_at?: Date
+
   // Frontend only
   __changedFields?: string[]
 }

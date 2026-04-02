@@ -30,6 +30,7 @@ from documents.consumer import ConsumerPreflightPlugin
 from documents.consumer import WorkflowTriggerPlugin
 from documents.data_models import ConsumableDocument
 from documents.data_models import DocumentMetadataOverrides
+from documents.data_models import DocumentSource
 from documents.double_sided import CollatePlugin
 from documents.file_handling import create_source_path_directory
 from documents.file_handling import generate_unique_filename
@@ -145,13 +146,22 @@ def consume_file(
     if overrides is None:
         overrides = DocumentMetadataOverrides()
 
-    plugins: list[type[ConsumeTaskPlugin]] = [
-        ConsumerPreflightPlugin,
-        CollatePlugin,
-        BarcodePlugin,
-        WorkflowTriggerPlugin,
-        ConsumerPlugin,
-    ]
+    if input_doc.source == DocumentSource.Crawler:
+        from documents.plugins.reference import ReferenceConsumerPlugin
+        from documents.plugins.reference import ReferencePreflightPlugin
+
+        plugins: list[type[ConsumeTaskPlugin]] = [
+            ReferencePreflightPlugin,
+            ReferenceConsumerPlugin,
+        ]
+    else:
+        plugins: list[type[ConsumeTaskPlugin]] = [
+            ConsumerPreflightPlugin,
+            CollatePlugin,
+            BarcodePlugin,
+            WorkflowTriggerPlugin,
+            ConsumerPlugin,
+        ]
 
     with (
         ProgressManager(

@@ -826,7 +826,17 @@ class DocumentViewSet(
     def destroy(self, request, *args, **kwargs):
         from documents import index
 
-        index.remove_document_from_index(self.get_object())
+        obj = self.get_object()
+
+        # dexadoc: block destructive delete for external docs — use unindex instead
+        if getattr(obj, "is_external", False):
+            return HttpResponse(
+                "For external documents use the unindex action.",
+                status=409,
+                content_type="text/plain",
+            )
+
+        index.remove_document_from_index(obj)
         try:
             return super().destroy(request, *args, **kwargs)
         except Exception as e:
@@ -838,6 +848,22 @@ class DocumentViewSet(
             return HttpResponseBadRequest(
                 "Error deleting document, check logs for more detail.",
             )
+
+    @action(detail=True, methods=["post"])
+    def unindex(self, request, pk=None):
+        """Remove an external document from the index without touching the external file."""
+        from documents import index
+
+        doc = self.get_object()
+        if not getattr(doc, "is_external", False):
+            return HttpResponseBadRequest(
+                "Unindex is only available for external documents.",
+            )
+        if not settings.DEXADOC_EXTERNAL_ALLOW_UNINDEX:
+            return HttpResponseForbidden("Unindexing external documents is disabled.")
+        index.remove_document_from_index(doc)
+        doc.delete()  # soft delete via SoftDeleteModel
+        return Response({"detail": "Document unindexed."}, status=200)
 
     @staticmethod
     def original_requested(request):
@@ -2737,6 +2763,23 @@ class SharedLinkView(View):
 
 
 def serve_file(*, doc: Document, use_archive: bool, disposition: str):
+    # dexadoc: check availability for external docs serving the original
+    if getattr(doc, "is_external", False) and not use_archive:
+        try:
+            source_path = doc.source_path
+            if not source_path.is_file():
+                return HttpResponse(
+                    "External source file is not currently available.",
+                    status=503,
+                    content_type="text/plain",
+                )
+        except (ValueError, OSError):
+            return HttpResponse(
+                "External source file path is invalid.",
+                status=503,
+                content_type="text/plain",
+            )
+
     if use_archive:
         file_handle = doc.archive_file
         filename = doc.get_public_filename(archive=True)

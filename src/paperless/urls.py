@@ -80,6 +80,10 @@ api_router.register(r"custom_fields", CustomFieldViewSet)
 api_router.register(r"config", ApplicationConfigurationViewSet)
 api_router.register(r"processed_mail", ProcessedMailViewSet)
 
+from external_sources.views import ExternalSourceViewSet
+
+api_router.register(r"external_sources", ExternalSourceViewSet)
+
 
 urlpatterns = [
     re_path(

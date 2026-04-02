@@ -9,6 +9,7 @@ from datetime import datetime
 from datetime import time
 from datetime import timedelta
 from datetime import timezone
+from pathlib import Path
 from shutil import rmtree
 from time import sleep
 from typing import TYPE_CHECKING
@@ -95,6 +96,16 @@ def get_schema() -> Schema:
         page_count=NUMERIC(sortable=True),
         original_filename=TEXT(sortable=True),
         is_shared=BOOLEAN(),
+        # dexadoc: external reference fields
+        storage_backend=KEYWORD(),
+        is_external=BOOLEAN(),
+        external_source=TEXT(sortable=True),
+        external_source_id=NUMERIC(),
+        external_relpath=TEXT(sortable=True),
+        external_dir=TEXT(sortable=True),
+        external_basename=TEXT(sortable=True),
+        display_path=TEXT(sortable=True),
+        source_available=BOOLEAN(),
     )
 
 
@@ -219,6 +230,40 @@ def update_document(writer: AsyncWriter, doc: Document) -> None:
         page_count=doc.page_count,
         original_filename=doc.original_filename,
         is_shared=len(viewer_ids) > 0,
+        # dexadoc: external reference fields
+        storage_backend=getattr(doc, "storage_backend", "managed"),
+        is_external=getattr(doc, "is_external", False),
+        external_source=(
+            doc.external_source.name
+            if getattr(doc, "is_external", False) and doc.external_source
+            else None
+        ),
+        external_source_id=(
+            doc.external_source_id
+            if getattr(doc, "is_external", False)
+            else None
+        ),
+        external_relpath=(
+            doc.external_relpath
+            if getattr(doc, "is_external", False)
+            else None
+        ),
+        external_dir=(
+            str(Path(doc.external_relpath).parent)
+            if getattr(doc, "is_external", False) and doc.external_relpath
+            else None
+        ),
+        external_basename=(
+            Path(doc.external_relpath).name
+            if getattr(doc, "is_external", False) and doc.external_relpath
+            else None
+        ),
+        display_path=(
+            doc.display_source_path
+            if getattr(doc, "is_external", False)
+            else None
+        ),
+        source_available=getattr(doc, "source_available", True),
     )
     logger.debug(f"Index updated for document {doc.pk}.")
 
@@ -456,6 +501,8 @@ class DelayedFullTextQuery(DelayedQuery):
                 "type",
                 "notes",
                 "custom_fields",
+                "external_relpath",
+                "display_path",
             ],
             self.searcher.ixreader.schema,
         )

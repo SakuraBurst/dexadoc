@@ -146,19 +146,24 @@ class DocumentSource(IntEnum):
     ApiUpload = 2
     MailFetch = 3
     WebUI = 4
+    Crawler = 5
 
 
 @dataclasses.dataclass
 class ConsumableDocument:
     """
-    Encapsulates an incoming document, either from consume folder, API upload
-    or mail fetching and certain useful operations on it.
+    Encapsulates an incoming document, either from consume folder, API upload,
+    mail fetching, or external source crawling and certain useful operations on it.
     """
 
     source: DocumentSource
     original_file: Path
     original_path: Path | None = None
     mailrule_id: int | None = None
+    external_source_id: int | None = None
+    external_relpath: str | None = None
+    source_stat_mtime_ns: int | None = None
+    source_stat_size: int | None = None
     mime_type: str = dataclasses.field(init=False, default=None)
 
     def __post_init__(self):

@@ -1,5 +1,6 @@
 import { AsyncPipe, NgTemplateOutlet } from '@angular/common'
 import { HttpClient, HttpResponse } from '@angular/common/http'
+import { environment } from 'src/environments/environment'
 import { Component, inject, OnDestroy, OnInit, ViewChild } from '@angular/core'
 import {
   FormArray,
@@ -1004,6 +1005,44 @@ export class DocumentDetailComponent
           this.toastService.showError($localize`Error deleting document`, error)
           modal.componentInstance.buttonsEnabled = true
           this.subscribeModalDelete(modal)
+        },
+      })
+  }
+
+  copyExternalPath() {
+    if (this.document?.display_source_path) {
+      navigator.clipboard.writeText(this.document.display_source_path).then(() => {
+        this.toastService.showInfo($localize`Path copied to clipboard`)
+      })
+    }
+  }
+
+  unindex() {
+    let modal = this.modalService.open(ConfirmDialogComponent, {
+      backdrop: 'static',
+    })
+    modal.componentInstance.title = $localize`Confirm`
+    modal.componentInstance.messageBold = $localize`Do you really want to unindex the external document "${this.document.title}"?`
+    modal.componentInstance.message = $localize`The file on the external share will not be affected.`
+    modal.componentInstance.btnClass = 'btn-warning'
+    modal.componentInstance.btnCaption = $localize`Unindex`
+    modal.componentInstance.confirmClicked
+      .pipe(
+        switchMap(() => {
+          modal.componentInstance.buttonsEnabled = false
+          return this.http.post(`${environment.apiBaseUrl}documents/${this.documentId}/unindex/`, {})
+        })
+      )
+      .pipe(takeUntil(this.unsubscribeNotifier))
+      .subscribe({
+        next: () => {
+          modal.close()
+          this.toastService.showInfo($localize`Document unindexed`)
+          this.close()
+        },
+        error: (error) => {
+          this.toastService.showError($localize`Error unindexing document`, error)
+          modal.componentInstance.buttonsEnabled = true
         },
       })
   }

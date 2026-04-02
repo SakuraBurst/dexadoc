@@ -105,8 +105,63 @@ def check_sanity(*, progress=False, scheduled=True) -> SanityCheckMessages:
             except OSError as e:
                 messages.error(doc.pk, f"Cannot read thumbnail file of document: {e}")
 
+        # --- dexadoc: external docs have different sanity semantics ---
+        if getattr(doc, "is_external", False):
+            try:
+                source_path = Path(doc.source_path).resolve()
+            except ValueError:
+                messages.error(
+                    doc.pk,
+                    "External document has invalid source path configuration.",
+                )
+                if not doc.content:
+                    messages.info(doc.pk, "Document contains no OCR data")
+                continue
+
+            if not source_path.exists() or not source_path.is_file():
+                messages.warning(
+                    doc.pk,
+                    "External source file is not available.",
+                )
+                if doc.source_available:
+                    Document.objects.filter(pk=doc.pk).update(
+                        source_available=False,
+                        external_last_error="missing (sanity check)",
+                    )
+            else:
+                try:
+                    checksum = hashlib.md5(source_path.read_bytes()).hexdigest()
+                except OSError as e:
+                    messages.warning(
+                        doc.pk,
+                        f"Cannot read external source file: {e}",
+                    )
+                else:
+                    if checksum != doc.checksum:
+                        messages.error(
+                            doc.pk,
+                            "External file checksum mismatch. "
+                            f"Stored: {doc.checksum}, actual: {checksum}. "
+                            "Consider re-indexing this document.",
+                        )
+
+            # Check archive only if preview cache exists
+            if doc.has_archive_version:
+                archive_path = Path(doc.archive_path).resolve()
+                if not archive_path.exists():
+                    messages.warning(
+                        doc.pk,
+                        "Archive/preview cache file is missing.",
+                    )
+                elif archive_path in present_files:
+                    present_files.remove(archive_path)
+
+            if not doc.content:
+                messages.info(doc.pk, "Document contains no OCR data")
+            continue
+        # --- end dexadoc ---
+
         # Check sanity of the original file
-        # TODO: extract method
         source_path: Final[Path] = Path(doc.source_path).resolve()
         if not source_path.exists() or not source_path.is_file():
             messages.error(doc.pk, "Original of document does not exist.")

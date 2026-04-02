@@ -153,6 +153,11 @@ class StoragePath(MatchingModel):
         verbose_name_plural = _("storage paths")
 
 
+class StorageBackend(models.TextChoices):
+    MANAGED = "managed", _("managed")
+    EXTERNAL = "external", _("external reference")
+
+
 class Document(SoftDeleteModel, ModelWithOwner):
     STORAGE_TYPE_UNENCRYPTED = "unencrypted"
     STORAGE_TYPE_GPG = "gpg"
@@ -213,7 +218,7 @@ class Document(SoftDeleteModel, ModelWithOwner):
         _("checksum"),
         max_length=32,
         editable=False,
-        unique=True,
+        db_index=True,
         help_text=_("The checksum of the original document."),
     )
 
@@ -314,10 +319,82 @@ class Document(SoftDeleteModel, ModelWithOwner):
         ),
     )
 
+    # --- dexadoc: external reference storage fields ---
+
+    storage_backend = models.CharField(
+        _("storage backend"),
+        max_length=16,
+        choices=StorageBackend.choices,
+        default=StorageBackend.MANAGED,
+        db_index=True,
+    )
+
+    external_source = models.ForeignKey(
+        "external_sources.ExternalSource",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="documents",
+        verbose_name=_("external source"),
+    )
+
+    external_relpath = models.TextField(
+        _("external relative path"),
+        null=True,
+        blank=True,
+    )
+
+    external_mtime_ns = models.BigIntegerField(
+        _("external mtime (ns)"),
+        null=True,
+        blank=True,
+    )
+
+    external_size = models.BigIntegerField(
+        _("external file size"),
+        null=True,
+        blank=True,
+    )
+
+    source_available = models.BooleanField(
+        _("source available"),
+        default=True,
+        db_index=True,
+    )
+
+    last_seen_at = models.DateTimeField(
+        _("last seen at"),
+        null=True,
+        blank=True,
+    )
+
+    external_last_error = models.TextField(
+        _("external last error"),
+        blank=True,
+        default="",
+    )
+
+    # --- end dexadoc fields ---
+
     class Meta:
         ordering = ("-created",)
         verbose_name = _("document")
         verbose_name_plural = _("documents")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["checksum"],
+                condition=models.Q(storage_backend="managed"),
+                name="documents_document_managed_checksum_uniq",
+            ),
+            models.UniqueConstraint(
+                fields=["external_source", "external_relpath"],
+                condition=models.Q(
+                    storage_backend="external",
+                    deleted_at__isnull=True,
+                ),
+                name="documents_document_external_source_relpath_uniq",
+            ),
+        ]
 
     def __str__(self) -> str:
         created = self.created.isoformat()
@@ -329,6 +406,10 @@ class Document(SoftDeleteModel, ModelWithOwner):
         if self.title:
             res += f" {self.title}"
         return res
+
+    @property
+    def is_external(self) -> bool:
+        return self.storage_backend == StorageBackend.EXTERNAL
 
     @property
     def suggestion_content(self):
@@ -354,6 +435,8 @@ class Document(SoftDeleteModel, ModelWithOwner):
 
     @property
     def source_path(self) -> Path:
+        if self.is_external:
+            return self._external_source_path()
         if self.filename:
             fname = str(self.filename)
         else:
@@ -362,6 +445,29 @@ class Document(SoftDeleteModel, ModelWithOwner):
                 fname += ".gpg"  # pragma: no cover
 
         return (settings.ORIGINALS_DIR / Path(fname)).resolve()
+
+    def _external_source_path(self) -> Path:
+        if not self.external_source or not self.external_relpath:
+            raise ValueError(
+                f"External document {self.pk} missing external_source or external_relpath",
+            )
+        mount_root = Path(self.external_source.mount_root).resolve()
+        candidate = (mount_root / self.external_relpath).resolve()
+        if not candidate.is_relative_to(mount_root):
+            raise ValueError(
+                f"External document {self.pk}: path traversal detected. "
+                f"relpath={self.external_relpath!r} escapes mount_root={mount_root}",
+            )
+        return candidate
+
+    @property
+    def display_source_path(self) -> str | None:
+        if not self.is_external:
+            return None
+        if not self.external_source or not self.external_relpath:
+            return None
+        display_root = self.external_source.display_root or self.external_source.mount_root
+        return str(Path(display_root) / self.external_relpath)
 
     @property
     def source_file(self):

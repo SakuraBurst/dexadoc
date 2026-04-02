@@ -20,9 +20,24 @@
     </div>
   }
 
-  <button type="button" class="btn btn-sm btn-outline-danger me-md-4" (click)="delete()" [disabled]="!userIsOwner" *pngxIfPermissions="{ action: PermissionAction.Delete, type: PermissionType.Document }">
-    <i-bs width="1.2em" height="1.2em" name="trash"></i-bs><span class="d-none d-lg-inline ps-1" i18n>Delete</span>
-  </button>
+  @if (document?.is_external) {
+    <span class="badge text-bg-info me-2">External</span>
+    @if (document?.source_available) {
+      <span class="badge text-bg-success me-2">Available</span>
+    } @else {
+      <span class="badge text-bg-warning me-2">Unavailable</span>
+    }
+    <button type="button" class="btn btn-sm btn-outline-secondary me-1" (click)="copyExternalPath()" title="Copy external path">
+      <i-bs width="1.2em" height="1.2em" name="clipboard"></i-bs><span class="d-none d-lg-inline ps-1" i18n>Copy path</span>
+    </button>
+    <button type="button" class="btn btn-sm btn-outline-warning me-md-4" (click)="unindex()" [disabled]="!userIsOwner" *pngxIfPermissions="{ action: PermissionAction.Delete, type: PermissionType.Document }">
+      <i-bs width="1.2em" height="1.2em" name="x-circle"></i-bs><span class="d-none d-lg-inline ps-1" i18n>Unindex</span>
+    </button>
+  } @else {
+    <button type="button" class="btn btn-sm btn-outline-danger me-md-4" (click)="delete()" [disabled]="!userIsOwner" *pngxIfPermissions="{ action: PermissionAction.Delete, type: PermissionType.Document }">
+      <i-bs width="1.2em" height="1.2em" name="trash"></i-bs><span class="d-none d-lg-inline ps-1" i18n>Delete</span>
+    </button>
+  }
 
   <div class="btn-group">
     <button (click)="download()" class="btn btn-sm btn-outline-primary" [disabled]="downloading">
@@ -125,6 +140,19 @@
             <div>
               <pngx-input-text #inputTitle i18n-title title="Title" formControlName="title" [horizontal]="true" (keyup)="titleKeyUp($event)" [error]="error?.title"></pngx-input-text>
               <pngx-input-number i18n-title title="Archive serial number" [error]="error?.archive_serial_number" [horizontal]="true" formControlName='archive_serial_number'></pngx-input-number>
+              @if (document?.is_external && document?.display_source_path) {
+                <div class="row mb-3">
+                  <label class="col-md-3 col-form-label" i18n>External path</label>
+                  <div class="col-md-9">
+                    <div class="input-group">
+                      <input type="text" class="form-control" [value]="document.display_source_path" readonly>
+                      <button class="btn btn-outline-secondary" type="button" (click)="copyExternalPath()" i18n-title title="Copy path">
+                        <i-bs name="clipboard"></i-bs>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              }
               <pngx-input-date i18n-title title="Date created" formControlName="created" [suggestions]="suggestions?.dates" [showFilter]="true" [horizontal]="true" (filterDocuments)="filterDocuments($event)"
               [error]="error?.created"></pngx-input-date>
               <pngx-input-select [items]="correspondents" i18n-title title="Correspondent" formControlName="correspondent" [allowNull]="true" [showFilter]="true" [horizontal]="true" (filterDocuments)="filterDocuments($event, DataType.Correspondent)"

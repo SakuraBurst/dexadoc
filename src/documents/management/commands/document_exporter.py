@@ -188,6 +188,27 @@ class Command(CryptMixin, BaseCommand):
             help="If provided, is used to encrypt sensitive data in the export",
         )
 
+        # dexadoc: external document export options
+        parser.add_argument(
+            "--refs-only",
+            default=False,
+            action="store_true",
+            help=(
+                "For external documents, export only metadata, thumbnails, "
+                "and preview cache (not originals from mounted shares)."
+            ),
+        )
+
+        parser.add_argument(
+            "--with-external-files",
+            default=False,
+            action="store_true",
+            help=(
+                "For external documents, also attempt to copy original files "
+                "from mounted shares."
+            ),
+        )
+
     def handle(self, *args, **options):
         self.target = Path(options["target"]).resolve()
         self.split_manifest: bool = options["split_manifest"]
@@ -202,6 +223,8 @@ class Command(CryptMixin, BaseCommand):
         self.data_only: bool = options["data_only"]
         self.no_progress_bar: bool = options["no_progress_bar"]
         self.passphrase: str | None = options.get("passphrase")
+        self.refs_only: bool = options.get("refs_only", False)
+        self.with_external_files: bool = options.get("with_external_files", False)
 
         self.files_in_export_dir: set[Path] = set()
         self.exported_files: set[str] = set()
@@ -323,6 +346,23 @@ class Command(CryptMixin, BaseCommand):
 
             # 3.2. generate a unique filename
             base_name = self.generate_base_name(document)
+
+            # 3.2.1 dexadoc: add external metadata to manifest
+            if getattr(document, "is_external", False):
+                document_dict["dexadoc_storage_backend"] = document.storage_backend
+                document_dict["dexadoc_external_source_code"] = (
+                    document.external_source.code if document.external_source else None
+                )
+                document_dict["dexadoc_external_source_name"] = (
+                    document.external_source.name if document.external_source else None
+                )
+                document_dict["dexadoc_external_relpath"] = document.external_relpath
+                document_dict["dexadoc_display_source_path"] = (
+                    document.display_source_path
+                )
+                document_dict["dexadoc_source_available"] = document.source_available
+                document_dict["dexadoc_external_size"] = document.external_size
+                document_dict["dexadoc_external_mtime_ns"] = document.external_mtime_ns
 
             # 3.3. write filenames into manifest
             original_target, thumbnail_target, archive_target = (
@@ -482,6 +522,42 @@ class Command(CryptMixin, BaseCommand):
 
         If the document is encrypted, the files are decrypted before copying them to the target location.
         """
+        # dexadoc: external document export
+        if getattr(document, "is_external", False):
+            # Thumbnail: always copy if available
+            if thumbnail_target and Path(document.thumbnail_path).is_file():
+                self.check_and_copy(document.thumbnail_path, None, thumbnail_target)
+
+            # Archive/preview cache
+            if (
+                archive_target
+                and document.has_archive_version
+                and Path(document.archive_path).is_file()
+            ):
+                self.check_and_copy(
+                    document.archive_path,
+                    document.archive_checksum,
+                    archive_target,
+                )
+
+            # Original: only if --with-external-files and file is available
+            if self.with_external_files:
+                try:
+                    source = document.source_path
+                    if source.is_file():
+                        self.check_and_copy(source, document.checksum, original_target)
+                    else:
+                        logger.warning(
+                            f"External source unavailable for doc {document.pk}, "
+                            f"skipping original copy",
+                        )
+                except (ValueError, OSError) as e:
+                    logger.warning(
+                        f"Cannot copy external original for doc {document.pk}: {e}",
+                    )
+            return
+        # end dexadoc
+
         if document.storage_type == Document.STORAGE_TYPE_GPG:
             t = int(time.mktime(document.created.timetuple()))
 

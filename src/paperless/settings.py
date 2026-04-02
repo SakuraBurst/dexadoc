@@ -230,6 +230,17 @@ def _parse_beat_schedule() -> dict:
                 "expires": 59.0 * 60.0,
             },
         },
+        {
+            "name": "Scan external sources",
+            "env_key": "DEXADOC_EXTERNAL_SCAN_TASK_CRON",
+            # Default every 30 minutes
+            "env_default": "*/30 * * * *",
+            "task": "external_sources.tasks.scan_enabled_external_sources",
+            "options": {
+                # 1 minute before default schedule sends again
+                "expires": 29.0 * 60.0,
+            },
+        },
     ]
     for task in tasks:
         # Either get the environment setting or use the default
@@ -335,6 +346,7 @@ INSTALLED_APPS = [
     "drf_spectacular",
     "drf_spectacular_sidecar",
     "treenode",
+    "external_sources.apps.ExternalSourcesConfig",
     *env_apps,
 ]
 
@@ -1114,6 +1126,46 @@ CONSUMER_COLLATE_DOUBLE_SIDED_TIFF_SUPPORT: Final[bool] = __get_boolean(
 )
 
 CONSUMER_PDF_RECOVERABLE_MIME_TYPES = ("application/octet-stream",)
+
+###############################################################################
+# Dexadoc: External Sources
+###############################################################################
+
+DEXADOC_ENABLE_EXTERNAL_SOURCES: Final[bool] = __get_boolean(
+    "DEXADOC_ENABLE_EXTERNAL_SOURCES",
+    "YES",
+)
+
+DEXADOC_EXTERNAL_STORE_ARCHIVE_CACHE: Final[bool] = __get_boolean(
+    "DEXADOC_EXTERNAL_STORE_ARCHIVE_CACHE",
+)
+
+DEXADOC_EXTERNAL_HIDE_UNAVAILABLE_BY_DEFAULT: Final[bool] = __get_boolean(
+    "DEXADOC_EXTERNAL_HIDE_UNAVAILABLE_BY_DEFAULT",
+    "YES",
+)
+
+DEXADOC_EXTERNAL_DISABLE_CHECKSUM_DEDUP: Final[bool] = __get_boolean(
+    "DEXADOC_EXTERNAL_DISABLE_CHECKSUM_DEDUP",
+    "YES",
+)
+
+DEXADOC_EXTERNAL_ALLOW_UNINDEX: Final[bool] = __get_boolean(
+    "DEXADOC_EXTERNAL_ALLOW_UNINDEX",
+    "YES",
+)
+
+DEXADOC_EXTERNAL_MAX_SCAN_WORKERS: Final[int] = __get_int(
+    "DEXADOC_EXTERNAL_MAX_SCAN_WORKERS",
+    2,
+)
+
+DEXADOC_EXTERNAL_IGNORE_PATTERNS: Final[list[str]] = __get_list(
+    "DEXADOC_EXTERNAL_IGNORE_PATTERNS",
+    ["~$*", "._*", "Thumbs.db", "desktop.ini"],
+)
+
+###############################################################################
 
 OCR_PAGES = __get_optional_int("PAPERLESS_OCR_PAGES")
 
